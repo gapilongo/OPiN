@@ -1,4 +1,3 @@
-# File: frontend/web/src/pages/subscriptions/index.js
 
 import React, { useState, useEffect } from 'react';
 import { 
