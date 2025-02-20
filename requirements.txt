@@ -1,0 +1,17 @@
+fastapi==0.109.0
+uvicorn==0.27.0
+pydantic==2.5.3
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+SQLAlchemy==2.0.25
+alembic==1.13.1
+pytest==7.4.4
+httpx==0.26.0
+python-dotenv==1.0.0
+redis==5.0.1
+pymongo==4.6.1
+influxdb-client==1.39.0
+kafka-python==2.0.2
+pyzk==0.9
+PyJWT==2.8.0
