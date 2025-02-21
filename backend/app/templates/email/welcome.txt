@@ -1,0 +1,14 @@
+Welcome to OPiN!
+
+Hi {{ name }},
+
+Welcome to OPiN! We're excited to have you join our community.
+
+Get started by logging in to your account:
+{{ login_url }}
+
+If you need any help, check out our help center:
+{{ help_url }}
+
+Best regards,
+The OPiN Team
