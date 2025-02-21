@@ -1,0 +1,55 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Welcome to OPiN</title>
+</head>
+<body>
+    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+            <td align="center">
+                <table width="600" border="0" cellspacing="0" cellpadding="0">
+                    <tr>
+                        <td style="padding: 40px 0 30px 0;">
+                            <h1>Welcome to OPiN!</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <p>Hi {{ name }},</p>
+                            <p>Welcome to OPiN! We're excited to have you join our community.</p>
+                            <p>Get started by logging in to your account:</p>
+                            <p>
+                                <a href="{{ login_url }}" 
+                                   style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px;">
+                                    Login to Your Account
+                                </a>
+                            </p>
+                            <p>If you need any help, check out our <a href="{{ help_url }}">help center</a>.</p>
+                            <p>Best regards,<br>The OPiN Team</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+
+# File: backend/app/templates/email/welcome.txt
+
+Welcome to OPiN!
+
+Hi {{ name }},
+
+Welcome to OPiN! We're excited to have you join our community.
+
+Get started by logging in to your account:
+{{ login_url }}
+
+If you need any help, check out our help center:
+{{ help_url }}
+
+Best regards,
+The OPiN Team
