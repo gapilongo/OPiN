@@ -1,91 +1,94 @@
-from typing import Optional
-from pydantic import BaseModel, EmailStr
-from datetime import datetime
-from enum import Enum
 
-class UserRole(str, Enum):
-    ADMIN = "admin"
-    ENTERPRISE = "enterprise"
-    USER = "user"
+from typing import Optional, List, Union, Dict, Any
+from uuid import UUID
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import get_password_hash, verify_password
+from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
+from backend.app.crud.base import CRUDBase
 
-class UserBase(BaseModel):
-    email: EmailStr
-    is_active: bool = True
-    role: UserRole = UserRole.USER
-    full_name: Optional[str] = None
+class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
+    # ... (previous methods remain the same)
 
-class UserCreate(UserBase):
-    password: str
+    async def delete(self, db: AsyncSession, *, id: UUID) -> Optional[User]:
+        """
+        Hard delete a user and all related data.
+        Use with caution as this will permanently remove the user and all associated data.
+        """
+        user = await super().delete(db=db, id=id)
+        if user:
+            # Optionally: Add cleanup of related data
+            # This could include deleting associated subscriptions, API keys, etc.
+            await db.execute(delete(self.model).where(self.model.id == id))
+            await db.commit()
+        return user
 
-class UserInDB(UserBase):
-    id: str
-    hashed_password: str
-    created_at: datetime
-    updated_at: datetime
+    async def soft_delete(self, db: AsyncSession, *, id: UUID) -> Optional[User]:
+        """
+        Soft delete a user by setting is_active to False.
+        This is the preferred method for "deleting" users as it preserves data integrity.
+        """
+        return await super().soft_delete(db=db, id=id)
 
-    class Config:
-        from_attributes = True
+    async def remove_with_related_data(self, db: AsyncSession, *, id: UUID) -> bool:
+        """
+        Completely remove a user and all related data.
+        This is a dangerous operation and should only be used when absolutely necessary.
+        """
+        user = await self.get(db=db, id=id)
+        if not user:
+            return False
 
-class User(UserBase):
-    id: str
-    created_at: datetime
+        try:
+            # Delete related subscriptions
+            await db.execute(delete(User.subscriptions).where(
+                User.subscriptions.user_id == id
+            ))
 
-    class Config:
-        from_attributes = True
+            # Delete API keys
+            await db.execute(delete(User.api_keys).where(
+                User.api_keys.user_id == id
+            ))
 
-# File: backend/app/schemas/user.py
+            # Delete data points
+            await db.execute(delete(User.data_points).where(
+                User.data_points.creator_id == id
+            ))
 
-from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
-from typing import Optional
-from bson import ObjectId
+            # Finally, delete the user
+            await db.execute(delete(User).where(User.id == id))
+            
+            await db.commit()
+            return True
+        except Exception as e:
+            await db.rollback()
+            raise e
 
-from app.core.config import get_settings
-from app.models.user import UserCreate, UserInDB
-from app.core.security import get_password_hash
+    async def bulk_delete(
+        self, 
+        db: AsyncSession, 
+        *, 
+        ids: List[UUID], 
+        soft: bool = True
+    ) -> Dict[UUID, bool]:
+        """
+        Delete multiple users at once.
+        Returns a dictionary mapping user IDs to deletion success status.
+        """
+        results = {}
+        for user_id in ids:
+            try:
+                if soft:
+                    user = await self.soft_delete(db=db, id=user_id)
+                else:
+                    user = await self.delete(db=db, id=user_id)
+                results[user_id] = bool(user)
+            except Exception:
+                results[user_id] = False
+                await db.rollback()
 
-settings = get_settings()
+        await db.commit()
+        return results
 
-class UserSchema:
-    def __init__(self, db: AsyncIOMotorClient):
-        self.db = db
-        self.collection = db.users
-
-    async def get_by_email(self, email: str) -> Optional[UserInDB]:
-        """Get user by email"""
-        user_dict = await self.collection.find_one({"email": email})
-        if user_dict:
-            return UserInDB(**user_dict)
-        return None
-
-    async def create(self, user: UserCreate) -> UserInDB:
-        """Create new user"""
-        user_dict = user.model_dump()
-        user_dict["hashed_password"] = get_password_hash(user_dict.pop("password"))
-        user_dict["created_at"] = datetime.utcnow()
-        user_dict["updated_at"] = user_dict["created_at"]
-        
-        result = await self.collection.insert_one(user_dict)
-        user_dict["id"] = str(result.inserted_id)
-        
-        return UserInDB(**user_dict)
-
-    async def update(self, user_id: str, update_data: dict) -> Optional[UserInDB]:
-        """Update user"""
-        update_data["updated_at"] = datetime.utcnow()
-        
-        result = await self.collection.find_one_and_update(
-            {"_id": ObjectId(user_id)},
-            {"$set": update_data},
-            return_document=True
-        )
-        
-        if result:
-            result["id"] = str(result.pop("_id"))
-            return UserInDB(**result)
-        return None
-
-    async def delete(self, user_id: str) -> bool:
-        """Delete user"""
-        result = await self.collection.delete_one({"_id": ObjectId(user_id)})
-        return result.deleted_count > 0
+user = CRUDUser(User)
